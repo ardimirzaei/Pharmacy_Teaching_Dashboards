@@ -1,0 +1,948 @@
+---
+title: "PHAR3825 2020"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    
+date: "`r format(Sys.time(), '%I:%M %p, %d %b %Y')`"
+---
+
+```{r code block 1, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+
+source("HAR3825_Bar_Graph_2020_[function].R")
+```
+
+
+```{r setup, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(plyr)
+library(knitr)
+library(kableExtra)
+library(shinydashboard)
+library(flexdashboard)
+library(stringr)
+library(plotly)
+#load dataset
+
+fileDetails <- file.info(paste0("\\Data",(list.files("\\Data", pattern= "PHAR3825_2020.*csv"))))
+fileDetails <- fileDetails[with(fileDetails, order(as.POSIXct(mtime))), ]
+filesListed <- rownames(fileDetails)
+
+CSV_Location <- tail(filesListed,1)
+
+df_orig<-read.csv(CSV_Location)
+
+df<-df_orig  
+
+
+# Groupings
+
+df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F <- gsub("3825","",df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F)
+df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F <- str_extract(df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F, "[0-9]{1,2}")
+df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F <- as.factor(as.numeric(df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F))
+
+df <- df[!is.na(df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F),] # REmove NA Students
+# levels(df$CANVAS_SECTION_MEMBERSHIPS.47C94A6F) <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Groupx") 
+
+#####
+#####
+library(dplyr)
+
+
+
+#Set Standard For Graph Ordering
+lookup<-read.table(header = TRUE, 
+                    stringsAsFactors = FALSE, 
+ text="O R r1 r2 d1 D
+ 1 10 8 5 Tue Tue1
+ 2 11 9 5 Tue Tue2
+ 3 8 2 2 Fri Fri3
+ 4 9 3 2 Fri Fri4
+ 5 6 10 6 Mon Mon5
+ 6 7 11 6 Mon Mon6
+ 7 4 6 4 Wed Wed7
+ 8 5 7 4 Wed Wed8
+ 9 2 4 3 Thu Thu9
+ 10 3 5 3 Thu Thu10
+ ")
+
+df_merge<-merge(df,lookup[,c('O','D')], by.x=c("CANVAS_SECTION_MEMBERSHIPS.47C94A6F"), by.y=c("O"))
+
+i=6 #this number is thec column you want to read from in the code below
+#Run Code for individual classes
+for (z in unique(lookup[,'D'])){
+  df<-df_merge
+  df<-df[df$D==z,]
+  df_O<-nrow(df)
+  df<-ardiPHAR3825_2020_Bar_Graph(df)
+  xref="x"
+    if (z>0){xref=paste0("x",lookup[lookup$d1==z,i][1])}
+  yref="y"
+    if (z>0){yref=paste0("y",lookup[lookup$d1==z,i][1])}
+  a=list(x = 12,y = 66,text = z ,xanchor='center',showarrow=FALSE, xref = xref,yref = yref, font=list(size=28, color="red"))
+  df<-layout(df,title = paste0("Tutorial Group: ",z), showlegend = FALSE,xaxis=list(title = ""), yaxis=list(title = "", range = c(1,25)))#, 
+    #annotations=a) 
+    #list(x=3,y=10,text=z, showarrow=FALSE))
+  #df<-add_trace(df,marker=list(colour="red"))
+  newname<-paste0("df_",z)
+  assign(newname, df)
+}
+#create group graph
+df<-df_orig #load the original data
+df_all<-ardiPHAR3825_2020_Bar_Graph(df)
+df_all<-layout(df_all,title = "All Groups ", showlegend = TRUE ,xaxis=list(title = ""), yaxis=list(title = ""))
+
+
+
+```
+
+
+
+
+```{r , results='hide' , message=FALSE, warning=FALSE, echo=FALSE}
+# COUNSELLING PART
+source("PHAR3825_2020_Counsel_Table[function].R")
+
+
+```
+
+
+```{r, results='asis' , message=FALSE, warning=FALSE, echo=FALSE}
+
+counselling_stats <- function(dat_file) {
+
+  #Use the df_merge file where df_merge[df_merge$D==Mon5] etc
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+}
+
+
+
+```
+
+Quick Overview
+=======================================================================
+Row 
+-----------------------------------------------------------------------
+
+### Labels
+
+
+```{r}
+labels_checked <- sum(as.character(as.matrix(df[,grepl('Labels',colnames(df))])) %in%  c("SP","SUP","U"))
+valueBox(labels_checked, 
+         caption = paste0("Total number of products dispensed" ),  
+         color = "#009E73")
+```
+
+
+Row 
+-----------------------------------------------------------------------
+
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df <- df_orig
+source("PHAR3825_2020_Label_Stats.R")
+Label_Stats_Out <- Label_Stats(df)
+```
+
+### Highest number of SP and SUP's
+```{r}
+
+valueBox(Label_Stats_Out$top_score,  icon = "fa-pencil")
+```
+
+### Students with highest mark
+```{r}
+
+valueBox(length(Label_Stats_Out$top_students),  icon = "fa-pencil")
+```
+
+
+### Highest number of U's
+```{r}
+
+valueBox(Label_Stats_Out$lowest_Score,  icon = "fa-pencil", color = "warning")
+```
+
+
+### Number of students with lowest mark
+```{r}
+
+valueBox(Label_Stats_Out$n_students_lowscore,  icon = "fa-pencil", color = "warning")
+```
+
+
+Row 
+-----------------------------------------------------------------------
+
+### Group Performance
+Best :
+
+```{r}
+
+valueBox(Label_Stats_Out$best_group[1], 
+         caption = paste0("Averaging ", round(Label_Stats_Out$best_group[2],2)," SP's per student" ),  
+         icon = "fa-smile")
+```
+
+### Group Performance
+SP Avg:
+
+```{r}
+
+valueBox(round(Label_Stats_Out$mean_group_SP[1],2), 
+         caption = paste0("Average SP per student across all groups" ),  
+         icon = "fa-smile")
+```
+
+### Group Performance
+Worst :
+
+
+```{r}
+valueBox(Label_Stats_Out$worst_group[1], 
+         caption = paste0("Averaging ", round(Label_Stats_Out$worst_group[2],2)," U's per student" ),  
+         icon = "fa-frown", 
+         color = "warning")
+```
+
+### Group Performance
+
+U Avg:
+
+```{r}
+
+valueBox(round(Label_Stats_Out$mean_group_U[1],2), 
+         caption = paste0("Average U per student across all groups" ),  
+         icon = "fa-frown", 
+         color = "warning")
+```
+
+
+Row 
+-----------------------------------------------------------------------
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+source("PHAR3825_2020_Label_Stats.R")
+Completion_rates <- CompletionRates(df)
+```
+
+
+### Schedule 1 Completion Rate
+
+```{r}
+rate <- Completion_rates[[1]][1,]
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+
+```
+
+
+### Schedule 2 Completion Rate
+
+```{r}
+rate <- Completion_rates[[1]][2,]
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+
+```
+
+### Schedule 3 Completion Rate
+
+```{r}
+rate <- Completion_rates[[1]][3,]
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+
+```
+
+### Schedule 4 Completion Rate
+
+```{r}
+rate <- Completion_rates[[1]][4,]
+gauge(rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+
+```
+
+
+
+Row 
+-----------------------------------------------------------------------
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+source("PHAR3825_2020_Counselling_Stats.R")
+
+```
+
+
+### Counselling
+
+
+```{r}
+counselling_couducted <- sum(as.character(as.matrix(df[,grepl('OVERALL',colnames(df))])) %in%  c("SP","SUP","U"))
+valueBox(counselling_couducted, 
+         caption = paste0("Total number of counselling sessions conducted" ),  
+         color = "#009E73")
+```
+
+
+
+Row 
+-----------------------------------------------------------------------
+
+
+### Pass Rate
+
+
+```{r}
+rate <- students_passing_counselling(df)
+valueBox(rate$count, 
+         caption = paste0("Students Passed"),  
+         icon = "fa-smile")
+```
+
+### Pass Rate
+
+```{r}
+rate <- students_passing_counselling(df)
+gauge(rate$rate, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+
+```
+
+
+### Pass Rate
+
+
+```{r}
+rate <- students_passing_counselling(df)
+rate <- nrow(df) - rate$count
+valueBox(rate, 
+         caption = paste0("Students yet to pass"),  
+         icon = "fa-frown", 
+         color = "warning")
+```
+
+
+
+
+Row 
+-----------------------------------------------------------------------
+
+```{r,fig.height = 3, fig.width=20}
+
+b <- student_reflection(df,1)
+ggplotly(b)
+
+
+```
+
+
+
+Products {data-navmenu="2019 Comparisons" }
+=======================================================================
+
+Row {data-orientation=rows}
+-----------------------------------------------------------------------
+
+### 2019
+```{r}
+
+source("PHAR3825_Plot2019_Progress.R")
+
+source("PHAR3825_Plot2020_Progress.R")
+
+df_2019 <- read.csv("PHAR3825_2019_2_export") # LOAD 2019 DATA
+#Plot Product Progress 2019
+b <- plot_progress_2019(df_2019)$graph_2019_products
+ggplotly(b)
+
+```
+
+### 2020
+
+```{r}
+
+# Plot Product Progress current
+b <- plot_progress_2020(df)$graph_2020_products
+ggplotly(b)
+
+```
+
+
+
+Counselling {data-navmenu="2019 Comparisons" }
+=======================================================================
+
+Row {data-orientation=rows}
+-----------------------------------------------------------------------
+
+### 2019
+```{r}
+
+
+
+#Plot Counselling Progress 2019
+b <- plot_progress_2019(df_2019)$graph_2019_counselling
+ggplotly(b)
+
+```
+
+### 2020
+
+```{r}
+
+# Plot Product Counselling current
+b <- plot_progress_2020(df)$graph_2020_counselling
+ggplotly(b)
+
+```
+
+
+All Groups 
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Labels
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_all
+```
+
+### Counselling
+
+```{r, results="asis" , message=FALSE, warning=FALSE, echo=FALSE}
+df<-df_orig
+
+df_bind<-ardiPHAR3825_2020_Counsel_Table(df)
+rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+i<-htmltools::tagList()
+
+#Results
+df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+rownames(df_bind_results) <- c('SP','SUP','U')
+df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+kable(df_bind_results) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+# Content
+df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+rownames(df_bind_content) <- CStore
+
+kable(df_bind_content)%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+# Communication
+df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+rownames(df_bind_comms) <- CoStore
+kable(df_bind_comms)%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+Monday 
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Labels Group 5
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+
+df_Mon5
+```
+
+### Counselling Group 5
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Mon5",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 6
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+df_Mon6
+```
+
+### Counselling Group 6
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Mon6",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+Tuesday 
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 1
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Tue1
+```
+
+### Counselling Group 1
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Tue1",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 2
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Tue2
+```
+
+### Counselling Group 2
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Tue2",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+Wednesday 
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 7
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Wed7
+```
+
+### Counselling Group 7
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Wed7",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 8
+
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Wed8
+```
+
+### Counselling Group 8
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Wed8",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+
+Thursday 
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 9
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Thu9
+```
+
+
+### Counselling Group 9
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Thu9",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 10
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Thu10
+```
+
+### Counselling Group 10
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Thu10",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+Friday
+=======================================================================
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 3
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+df_Fri3
+```
+
+### Counselling Group 3
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Fri3",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+### Labels Group 4
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+df_Fri4
+```
+
+### Counselling Group 4
+```{r , message=FALSE, warning=FALSE, echo=FALSE}
+
+dat_file <- (df_merge[df_merge$D=="Fri4",])
+
+  df_bind<-ardiPHAR3825_2020_Counsel_Table(dat_file)
+  rownames(df_bind)[4:(nrow(SRES_Components)+3)]<-SRES_Components[,2]
+
+  i<-htmltools::tagList()
+
+  #Results
+  df_bind_results<-as.data.frame(df_bind[c('SP','SUP','U'),grepl('OVERALL',colnames(df_bind))])
+  colnames(df_bind_results) <- colnames(df_bind)[grepl('OVERALL',colnames(df_bind))]
+  rownames(df_bind_results) <- c('SP','SUP','U')
+  df_bind_results[is.na(df_bind_results)]<-0 # For the graph to work. 
+
+  ardiPHAR3825_2020_Counsel_Graph(df_bind_results)
+
+  kable(df_bind_results) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Content
+  df_bind_content<-as.data.frame(df_bind[CStore,grepl('CONTENT',colnames(df_bind))])
+  colnames(df_bind_content) <- colnames(df_bind)[grepl('CONTENT',colnames(df_bind))]
+  rownames(df_bind_content) <- CStore
+
+  kable(df_bind_content)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+
+  # Communication
+  df_bind_comms<-as.data.frame(df_bind[CoStore,grepl('COMMUNICATION',colnames(df_bind))])
+  colnames(df_bind_comms) <- colnames(df_bind)[grepl('COMMUNICATION',colnames(df_bind))]
+  rownames(df_bind_comms) <- CoStore
+  kable(df_bind_comms)%>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
