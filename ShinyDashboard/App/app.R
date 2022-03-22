@@ -6,7 +6,7 @@
 #
 #    http://shiny.rstudio.com/
 #
-list.of.packages <- c("shiny", "stringr","httr","jsonlite", "dplyr", "tidyr", "DT", "shinydashboard", "plotly")
+list.of.packages <- c("shiny", "stringr","httr","jsonlite", "dplyr", "tidyr", "DT", "shinydashboard", "plotly","shinyBS")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
@@ -19,8 +19,10 @@ library(tidyr)
 library(DT)
 library(shinydashboard)
 library(plotly)
+library(shinyBS)
 
-source("phar3825_functions.R")
+
+source("extra_functions.R")
 
 #https://rstudio.github.io/shinydashboard/structure.html
 #https://fontawesome.com/v4/icons/
@@ -52,7 +54,8 @@ sidebar <- dashboardSidebar(
                  menuSubItem("Documentation", tabName = "documentation",icon = icon("angle-double-right"))
                  ),
         
-        menuItem("Group Plots", tabName = "group_plot", icon = icon("chart-bar"))
+        menuItem("Group Plots", tabName = "group_plot", icon = icon("chart-bar")),
+        menuItem("Settings", tabName = "settings", icon = icon("gear"))
     )
 )
 
@@ -106,6 +109,23 @@ body <- dashboardBody(
                 plotlyOutput('group_plots')
                 
 
+        ),
+        tabItem(tabName = "settings",
+                h2("Settings"),
+                h3('SRES Table'),
+                actionButton("showTable", "Show Table", icon = icon("table")),
+                textInput("uuid", "Table UUID", value = "", width = NULL, placeholder = key_placeholder),
+                bsModal("modalExample", "Data Table", "showTable", size = "large",
+                        dataTableOutput("all_sres_table")),
+                br(),
+                fluidRow(
+                    column(4,
+                           checkboxInput('CB_FN', 'First Name', value = FALSE),
+                           checkboxInput('CB_MN', 'Middle Name', value = FALSE)
+                    )
+                ),
+                downloadButton("download_button", label = "Save Settings to File")
+                
         )
     )
 )
@@ -315,8 +335,27 @@ server <- function(input, output, session) {
     })
     output$prod <- renderDataTable({ 
         datatable(vals$products, options = list(paging = FALSE))
+        
     })
-    
+    observeEvent(input$showTable,{
+        withProgress(message = 'Refreshing Data', value = 0, {
+            if (file.exists("sresapi.key")){
+                sres_api_token <- readLines("sresapi.key", warn = FALSE)
+                # if (nchar(sres_api_token)<32){ sres_api_token <- "Please Add Your SRES API Key" }
+            } else {
+                sres_api_token <- input$sresapi    
+            }
+            incProgress(1/2, detail = 'Loading Tables')
+            output$all_sres_table <- renderDataTable({
+                url <- "https://sres.sydney.edu.au/api/v1/tables"
+                tables <- download_content(sres_api_token, url)
+                datatable(tables[c('year','code','name','uuid')], options = list(lengthChange = FALSE))
+                
+                })
+            incProgress(1, detail = 'Finished')
+        })
+        
+    })
 
 }
 
